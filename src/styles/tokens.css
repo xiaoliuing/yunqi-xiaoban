@@ -1,0 +1,32 @@
+:root {
+  --paper: #FBF6EE;
+  --paper-deep: #F4ECDF;
+  --card: #FFFDF9;
+  --ink: #2B2420;
+  --ink-soft: #6F635A;
+  --ink-faint: #A89A8C;
+  --line: #EADFD0;
+
+  --apricot: #E07A4F;
+  --apricot-soft: #FBE3D6;
+  --apricot-ink: #A9502B;
+  --sage: #6F8F74;
+  --sage-soft: #DFE9DC;
+  --sage-ink: #4A6B50;
+  --butter: #F6E3A6;
+  --butter-ink: #7A5D12;
+  --sky-soft: #DCE8F0;
+  --sky-ink: #3E6680;
+  --alert: #C8483A;
+  --alert-soft: #FBE6E2;
+
+  --font-display: "Fraunces Variable", "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif;
+  --font-title: "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif;
+  --font-body: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Noto Sans SC", sans-serif;
+
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 0 rgba(43, 36, 32, .04), 0 8px 24px -12px rgba(120, 80, 50, .18);
+  --tabbar-h: 64px;
+}
