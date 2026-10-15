@@ -13,6 +13,7 @@ export const router = createRouter({
     { path: '/eat/ai', component: () => import('@/views/AskAiView.vue') },
     { path: '/pregnancy', component: () => import('@/views/PregnancyView.vue') },
     { path: '/pregnancy/checkups', component: () => import('@/views/CheckupsView.vue') },
+    { path: '/pregnancy/prenatal', component: () => import('@/views/PrenatalView.vue') },
     { path: '/pregnancy/redflags', component: () => import('@/views/RedFlagsView.vue') },
     { path: '/me', component: () => import('@/views/MeView.vue') },
     { path: '/me/weight', component: () => import('@/views/WeightView.vue') },

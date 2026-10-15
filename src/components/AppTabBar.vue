@@ -27,8 +27,8 @@ function isActive(to: string) {
 
 <style scoped>
 .tabbar {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: 0;
-  width: 100%; max-width: 430px;
+  position: fixed; left: 0; right: 0; bottom: 0;
+  width: 100%;
   height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   display: grid; grid-template-columns: repeat(4, 1fr);

@@ -1,20 +1,23 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; }
+html, body { margin: 0; width: 100%; }
 body {
   font-family: var(--font-body);
   color: var(--ink);
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
+#app { width: 100%; min-height: 100%; }
 button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
 button { cursor: pointer; }
 
 .page {
-  max-width: 430px;
-  margin: 0 auto;
+  width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: calc(env(safe-area-inset-top) + 18px) 20px calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 28px);
   position: relative;
+  overflow-x: clip;
 }
 .page-glow {
   position: absolute; z-index: -1; pointer-events: none;

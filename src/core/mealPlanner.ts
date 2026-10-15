@@ -1,7 +1,7 @@
 import { hashString, mulberry32 } from './random'
-import { RECIPES } from '@/content/recipes'
+import { getRecipe, RECIPES } from '@/content/recipes'
 import { FOCUS_TAGS } from '@/content/nutrition'
-import type { Exclusions, MealKind, PlanSlot, Recipe, Trimester } from '@/content/types'
+import type { AiDish, Exclusions, MealKind, PlanSlot, Recipe, Trimester } from '@/content/types'
 
 export const PLAN_SLOTS: { key: PlanSlot; kind: MealKind; label: string; time: string }[] = [
   { key: 'breakfast', kind: 'breakfast', label: '早餐', time: '7:30' },
@@ -59,6 +59,30 @@ export function planDay(ctx: PlanContext): DayPlan {
     if (chosen) used.add(chosen.id)
   }
   return plan
+}
+
+export function recipesFromLog(log: { date: string; plan: DayPlan; dishes?: Partial<Record<PlanSlot, AiDish>> }): Recipe[] {
+  const recipes: Recipe[] = []
+  for (const slot of PLAN_SLOTS) {
+    const dish = log.dishes?.[slot.key]
+    if (dish) {
+      recipes.push({
+        id: `ai:${log.date}:${slot.key}`,
+        name: dish.name,
+        tip: dish.tip,
+        kinds: [slot.kind],
+        trimesters: [1, 2, 3],
+        tags: dish.tags,
+        avoidTags: [],
+        ingredients: dish.ingredients,
+        steps: dish.steps,
+      })
+      continue
+    }
+    const recipe = log.plan[slot.key] ? getRecipe(log.plan[slot.key]!) : undefined
+    if (recipe) recipes.push(recipe)
+  }
+  return recipes
 }
 
 export function swapDish(plan: DayPlan, slotKey: PlanSlot, ctx: PlanContext, attempt: number): DayPlan {

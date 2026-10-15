@@ -5,8 +5,7 @@ import { useClock } from '@/composables/useClock'
 import { useMealsStore } from '@/stores/meals'
 import { addDays } from '@/core/date'
 import { buildShoppingList } from '@/core/shoppingList'
-import { getRecipe } from '@/content/recipes'
-import type { Recipe } from '@/content/types'
+import { recipesFromLog } from '@/core/mealPlanner'
 
 const { today } = useClock()
 const meals = useMealsStore()
@@ -18,15 +17,10 @@ watch(dates, (d) => meals.ensurePlans(d), { immediate: true })
 watch(storageKey, (k) => { checked.value = JSON.parse(localStorage.getItem(k) ?? '[]') }, { immediate: true })
 
 const groups = computed(() => {
-  const recipes: Recipe[] = []
-  for (const d of dates.value) {
+  const recipes = dates.value.flatMap((d) => {
     const log = meals.logs[d]
-    if (!log) continue
-    for (const id of Object.values(log.plan)) {
-      const r = id ? getRecipe(id) : undefined
-      if (r) recipes.push(r)
-    }
-  }
+    return log ? recipesFromLog(log) : []
+  })
   return buildShoppingList(recipes)
 })
 

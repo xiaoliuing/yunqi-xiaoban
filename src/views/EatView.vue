@@ -1,20 +1,55 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import SectionHead from '@/components/SectionHead.vue'
 import Disclaimer from '@/components/Disclaimer.vue'
+import FoodCard from '@/components/FoodCard.vue'
 import { searchFoods } from '@/core/foodSearch'
+import { useClock } from '@/composables/useClock'
 import { useProfileStore } from '@/stores/profile'
-import type { FoodLevel } from '@/content/types'
+import { getStatus } from '@/core/pregnancy'
+import { buildFoodSystemPrompt, parseFoodAnswer } from '@/ai/foodAnswer'
+import { askAi, AiError } from '@/ai/client'
 
+const { today } = useClock()
 const profile = useProfileStore()
 const query = ref('')
 const results = computed(() => searchFoods(query.value))
-const LEVEL: Record<FoodLevel, { label: string; cls: string }> = {
-  ok: { label: '可以吃', cls: 'ok' },
-  caution: { label: '适量吃', cls: 'caution' },
-  avoid: { label: '避免', cls: 'avoid' },
-}
+const asking = ref(false)
+const aiError = ref('')
+const aiFood = ref<{ name: string; level: ReturnType<typeof parseFoodAnswer>['level']; reason: string; advice: string } | null>(null)
 const quick = ['螃蟹', '咖啡', '西瓜', '山楂', '生鱼片', '冰淇淋']
+let requestId = 0
+
+watch(query, () => {
+  requestId += 1
+  asking.value = false
+  aiError.value = ''
+  aiFood.value = null
+})
+
+async function ask() {
+  const p = profile.profile
+  const name = query.value.trim()
+  if (!p?.ai || !name || results.value.length) return
+  const id = ++requestId
+  asking.value = true
+  aiError.value = ''
+  aiFood.value = { name, level: null, reason: '', advice: '' }
+  try {
+    const status = getStatus(p.dueDate, today.value)
+    const sys = buildFoodSystemPrompt({ week: status.week, day: status.day, trimester: status.trimester, exclusions: p.exclusions })
+    await askAi(p.ai, sys, `请判断这个食物：${name}`, fetch, (transcript) => {
+      if (id !== requestId) return
+      const parsed = parseFoodAnswer(transcript.content)
+      aiFood.value = { name, ...parsed }
+    })
+    if (id === requestId && !aiFood.value?.level) aiError.value = '没有判断出来，换个更具体的食物名再试一次'
+  } catch (e) {
+    if (id === requestId) aiError.value = e instanceof AiError ? e.message : '出了点问题，请稍后再试'
+  } finally {
+    if (id === requestId) asking.value = false
+  }
+}
 </script>
 
 <template>
@@ -22,17 +57,24 @@ const quick = ['螃蟹', '咖啡', '西瓜', '山楂', '生鱼片', '冰淇淋']
     <div class="page-glow" />
     <h1 class="title">这个能不能吃？</h1>
     <input v-model="query" class="search" type="search" placeholder="输入食物名称，比如：螃蟹" />
-    <div v-if="!query" class="chips quick">
+    <div v-if="!query.trim()" class="chips quick">
       <button v-for="q in quick" :key="q" class="chip" @click="query = q">{{ q }}</button>
     </div>
     <div v-else-if="results.length" class="results">
-      <article v-for="f in results" :key="f.name" class="card food">
-        <header><b>{{ f.name }}</b><span class="level" :class="LEVEL[f.level].cls">{{ LEVEL[f.level].label }}</span></header>
-        <p>{{ f.reason }}</p>
-        <p class="advice">{{ f.advice }}</p>
-      </article>
+      <FoodCard v-for="f in results" :key="f.name" :name="f.name" :level="f.level" :reason="f.reason" :advice="f.advice" />
     </div>
-    <p v-else class="muted empty">暂时没有收录「{{ query }}」<template v-if="profile.aiReady">，可以去问问 AI</template></p>
+    <div v-else class="empty">
+      <p class="muted">暂时没有收录「{{ query.trim() }}」</p>
+      <button v-if="profile.aiReady" class="btn dark ask" :disabled="asking" @click="ask">
+        {{ asking ? '正在问…' : `问 AI「${query.trim()}」能不能吃` }}
+      </button>
+      <RouterLink v-else to="/me/settings" class="btn dark ask">去设置里填写 API Key，才能问 AI</RouterLink>
+      <p v-if="aiError" class="error">{{ aiError }}</p>
+      <template v-if="aiFood && (aiFood.level || aiFood.reason || aiFood.advice)">
+        <FoodCard :name="aiFood.name" :level="aiFood.level" :reason="aiFood.reason" :advice="aiFood.advice" />
+        <p class="faint note">这条不在收录里，由 AI 判断，请以医生意见为准</p>
+      </template>
+    </div>
 
     <section class="block">
       <SectionHead title="吃饭这件事" />
@@ -49,16 +91,12 @@ const quick = ['螃蟹', '咖啡', '西瓜', '山楂', '生鱼片', '冰淇淋']
 .search { width: 100%; height: 50px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 15px; box-shadow: var(--shadow); }
 .quick { margin-top: 14px; }
 .results { margin-top: 14px; display: grid; gap: 10px; }
-.food { padding: 14px 16px; }
-.food header { display: flex; justify-content: space-between; align-items: center; }
-.food b { font-size: 16px; }
-.food p { margin: 8px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); }
-.food .advice { color: var(--ink); }
-.level { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
-.level.ok { background: var(--sage-soft); color: var(--sage-ink); }
-.level.caution { background: var(--butter); color: var(--butter-ink); }
-.level.avoid { background: var(--alert-soft); color: var(--alert); }
-.empty { margin-top: 16px; font-size: 14px; }
+.empty { margin-top: 16px; }
+.empty .muted { margin: 0; font-size: 14px; }
+.empty :deep(.food) { margin-top: 12px; }
+.ask { margin-top: 12px; height: 44px; padding: 0 18px; text-decoration: none; }
+.error { color: var(--alert); font-size: 13.5px; }
+.note { margin: 8px 0 0; font-size: 12px; }
 .entry { display: block; padding: 16px; margin-bottom: 10px; text-decoration: none; color: inherit; }
 .entry b { display: block; font-family: var(--font-title); font-size: 16px; }
 .entry span { display: block; margin-top: 4px; font-size: 13px; color: var(--ink-soft); }

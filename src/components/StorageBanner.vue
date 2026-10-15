@@ -12,7 +12,7 @@ const profile = useProfileStore()
 
 <style scoped>
 .banner {
-  position: sticky; top: 0; z-index: 20; max-width: 430px; margin: 0 auto;
+  position: sticky; top: 0; z-index: 20; width: 100%;
   padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
   background: var(--alert-soft); color: var(--alert); font-size: 12.5px; text-align: center;
 }

@@ -22,6 +22,7 @@ watch(dates, (d) => meals.ensurePlans(d), { immediate: true })
         v-if="meals.logs[d]"
         :plan="meals.logs[d].plan"
         :eaten="meals.logs[d].eaten"
+        :dishes="meals.logs[d].dishes"
         @toggle="(s) => meals.toggleEaten(d, s)"
         @swap="(s) => meals.swap(d, s)"
       />

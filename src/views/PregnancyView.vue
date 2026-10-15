@@ -51,6 +51,7 @@ onMounted(async () => {
 
     <section class="block">
       <SectionHead title="更多" />
+      <RouterLink to="/pregnancy/prenatal" class="card entry"><b>胎教</b><span>按孕周说明能做什么，以及哪些说法没有依据</span></RouterLink>
       <RouterLink to="/pregnancy/checkups" class="card entry"><b>产检日程</b><span>全部产检安排，可改日期、导入日历</span></RouterLink>
       <RouterLink to="/pregnancy/redflags" class="card entry alert"><b>危险信号</b><span>哪些情况要立即就医</span></RouterLink>
     </section>

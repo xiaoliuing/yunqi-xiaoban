@@ -22,9 +22,9 @@ function dismiss() {
 
 <style scoped>
 .hint {
-  position: fixed; left: 50%; transform: translateX(-50%);
+  position: fixed; left: 16px; right: 16px;
   bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px);
-  width: calc(100% - 32px); max-width: 398px; z-index: 15;
+  z-index: 15;
   display: flex; align-items: center; gap: 10px;
   padding: 12px 14px; border-radius: var(--radius-md);
   background: var(--ink); color: var(--paper); font-size: 13px;

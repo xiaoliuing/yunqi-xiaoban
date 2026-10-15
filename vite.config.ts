@@ -3,10 +3,14 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
+import { mealImageDevPlugin } from './scripts/meal-image-dev.ts'
+
+const root = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   plugins: [
     vue(),
+    mealImageDevPlugin(root),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'logo.svg'],

@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie'
 import type { DateStr } from '@/core/date'
 import type { DayPlan } from '@/core/mealPlanner'
 import type { CheckupOverride } from '@/core/checkupSchedule'
-import type { Exclusions, PlanSlot, SupplementId } from '@/content/types'
+import type { AiDish, Exclusions, PlanSlot, SupplementId } from '@/content/types'
 
 export interface AiSettings {
   baseUrl: string
@@ -27,6 +27,8 @@ export interface MealLog {
   plan: DayPlan
   eaten: PlanSlot[]
   swaps: number
+  source?: 'system' | 'ai'
+  dishes?: Partial<Record<PlanSlot, AiDish>>
 }
 
 export interface SupplementLog {

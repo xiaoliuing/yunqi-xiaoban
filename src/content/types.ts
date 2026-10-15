@@ -26,6 +26,19 @@ export interface Recipe {
   steps: string[]
 }
 
+/** AI 安排的一餐，字段和食谱卡片一致，不进内置食谱库。 */
+export interface AiDish {
+  name: string
+  tip: string
+  tags: NutrientTag[]
+  ingredients: Ingredient[]
+  steps: string[]
+  /** 给绘图模型的英文画面描述，不含风格和背景。 */
+  imagePrompt?: string
+  /** 生成后的 data URL，只存在本机。 */
+  image?: string
+}
+
 export interface Exclusions {
   tags: string[]
   ingredients: string[]

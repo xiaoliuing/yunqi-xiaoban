@@ -3,10 +3,14 @@ import { ref } from 'vue'
 import NutrientTag from './NutrientTag.vue'
 import { PLAN_SLOTS, type DayPlan } from '@/core/mealPlanner'
 import { getRecipe } from '@/content/recipes'
-import type { PlanSlot } from '@/content/types'
+import type { AiDish, PlanSlot } from '@/content/types'
 
-defineProps<{ plan: DayPlan; eaten: PlanSlot[] }>()
+const props = defineProps<{ plan: DayPlan; eaten: PlanSlot[]; dishes?: Partial<Record<PlanSlot, AiDish>>; locked?: boolean }>()
 const emit = defineEmits<{ toggle: [slot: PlanSlot]; swap: [slot: PlanSlot] }>()
+
+function card(key: PlanSlot): AiDish | undefined {
+  return props.dishes?.[key] ?? (props.plan[key] ? getRecipe(props.plan[key]!) : undefined)
+}
 
 const open = ref<PlanSlot | null>(null)
 const spinning = ref<PlanSlot | null>(null)
@@ -25,22 +29,22 @@ function onSwap(slot: PlanSlot) {
     <div v-for="s in PLAN_SLOTS" :key="s.key" class="meal" :class="{ eaten: eaten.includes(s.key) }" :data-slot="s.key">
       <div class="when"><b>{{ s.label }}</b><small>{{ s.time }}</small></div>
       <div class="what" :class="{ swapping: spinning === s.key }">
-        <template v-if="plan[s.key] && getRecipe(plan[s.key]!)">
-          <button class="name" @click="open = open === s.key ? null : s.key">{{ getRecipe(plan[s.key]!)!.name }}</button>
-          <div class="sub">{{ getRecipe(plan[s.key]!)!.tip }}</div>
-          <div class="tags"><NutrientTag v-for="t in getRecipe(plan[s.key]!)!.tags" :key="t" :tag="t" /></div>
+        <template v-if="card(s.key)">
+          <button class="name" @click="open = open === s.key ? null : s.key">{{ card(s.key)!.name }}</button>
+          <div class="sub">{{ card(s.key)!.tip }}</div>
+          <div class="tags"><NutrientTag v-for="t in card(s.key)!.tags" :key="t" :tag="t" /></div>
           <div v-if="open === s.key" class="detail">
-            <p><b>食材：</b>{{ getRecipe(plan[s.key]!)!.ingredients.map((i) => `${i.name} ${i.amount}`).join('、') }}</p>
-            <ol><li v-for="(step, i) in getRecipe(plan[s.key]!)!.steps" :key="i">{{ step }}</li></ol>
+            <p><b>食材：</b>{{ card(s.key)!.ingredients.map((i) => `${i.name} ${i.amount}`).join('、') }}</p>
+            <ol><li v-for="(step, i) in card(s.key)!.steps" :key="i">{{ step }}</li></ol>
           </div>
         </template>
         <div v-else class="sub">暂无合适推荐</div>
       </div>
       <div class="acts">
-        <button class="check" aria-label="标记已吃" :disabled="!plan[s.key]" @click="emit('toggle', s.key)">
+        <button class="check" aria-label="标记已吃" :disabled="locked || !card(s.key)" @click="emit('toggle', s.key)">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M3.5 8.3l3 3 6-6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
-        <button class="swap" :class="{ spin: spinning === s.key }" :disabled="!plan[s.key]" @click="onSwap(s.key)">
+        <button class="swap" :class="{ spin: spinning === s.key }" :disabled="locked || !card(s.key)" @click="onSwap(s.key)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13l-3-3M20 15H7l3 3" /></svg>
           换一份
         </button>
