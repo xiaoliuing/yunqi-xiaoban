@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { askAi, AiError, deltaFromSseLine } from '@/ai/client'
+import { contextTokensOf, DEFAULT_CONTEXT_TOKENS } from '@/db'
 
 const settings = { baseUrl: 'https://api.example.com/v1/', apiKey: 'sk-1', model: 'm' }
 
@@ -13,6 +14,7 @@ describe('askAi', () => {
     expect(init.headers.Authorization).toBe('Bearer sk-1')
     const body = JSON.parse(init.body)
     expect(body.stream).toBe(true)
+    expect(body.max_tokens).toBe(DEFAULT_CONTEXT_TOKENS)
     expect(body.messages).toEqual([
       { role: 'system', content: 'sys' },
       { role: 'user', content: '问题' },
@@ -85,7 +87,7 @@ describe('askAi', () => {
     expect(deltaFromSseLine(': ping')).toBeNull()
   })
 
-  it('says the answer was cut off when the stream dies after only thinking', async () => {
+  it('treats a dropped stream that never wrote an answer as a network break', async () => {
     const encoder = new TextEncoder()
     let sent = false
     const stream = new ReadableStream({
@@ -95,11 +97,11 @@ describe('askAi', () => {
           controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"reasoning_content":"先想菜单"}}]}\n\n'))
           return
         }
-        controller.error(new DOMException('The operation was aborted', 'TimeoutError'))
+        controller.error(new DOMException('The operation was aborted', 'AbortError'))
       },
     })
     const fetchImpl = vi.fn().mockResolvedValue(new Response(stream, { status: 200 }))
-    await expect(askAi(settings, 's', 'q', fetchImpl)).rejects.toThrow('回答超时')
+    await expect(askAi(settings, 's', 'q', fetchImpl)).rejects.toThrow('网络中断了')
   })
 
   it('keeps a partial answer when the stream breaks after the text has started', async () => {
@@ -121,10 +123,63 @@ describe('askAi', () => {
 
   it('gives the meal call enough room to finish after thinking', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: '答案' } }] }), { status: 200 }))
-    await askAi(settings, 'sys', '问题', fetchImpl, undefined, { maxTokens: 8192, timeoutMs: 180_000 })
+    await askAi(settings, 'sys', '问题', fetchImpl, undefined, { maxTokens: 65_536, reasoningEffort: 'low' })
     const body = JSON.parse(fetchImpl.mock.calls[0][1].body)
-    expect(body.max_tokens).toBe(8192)
-    expect(fetchImpl.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
+    expect(body.max_tokens).toBe(65536)
+    expect(body.reasoning_effort).toBe('low')
+    expect(fetchImpl.mock.calls[0][1].signal).toBeUndefined()
+  })
+
+  it('sends the configured context length as the output budget', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: '答案' } }] }), { status: 200 }))
+    await askAi({ ...settings, contextTokens: 1_048_576 }, 'sys', '问题', fetchImpl)
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).max_tokens).toBe(DEFAULT_CONTEXT_TOKENS)
+    expect(contextTokensOf(undefined)).toBe(DEFAULT_CONTEXT_TOKENS)
+    expect(contextTokensOf({ contextTokens: 100 })).toBe(DEFAULT_CONTEXT_TOKENS)
+    expect(contextTokensOf({ contextTokens: 1_048_576 })).toBe(DEFAULT_CONTEXT_TOKENS)
+  })
+
+  it('steps a rejected budget down without jumping to the smallest cap', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response('too big', { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '答案' } }] }), { status: 200 }))
+    const answer = await askAi({ ...settings, contextTokens: DEFAULT_CONTEXT_TOKENS }, 'sys', '问题', fetchImpl)
+    expect(answer).toBe('答案')
+    const bodies = fetchImpl.mock.calls.map((call) => JSON.parse(call[1].body))
+    expect(bodies[0].max_tokens).toBe(DEFAULT_CONTEXT_TOKENS)
+    expect(bodies[1].max_tokens).toBe(131_072)
+  })
+
+  it('retries without the extra fields when the endpoint rejects them', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response('{"error":{"message":"unknown"}}', { status: 400 }))
+      .mockResolvedValueOnce(new Response('{"error":{"message":"too many tokens"}}', { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '答案' } }] }), { status: 200 }))
+    const answer = await askAi(settings, 'sys', '问题', fetchImpl, undefined, { maxTokens: 65_536, reasoningEffort: 'low' })
+    expect(answer).toBe('答案')
+    const bodies = fetchImpl.mock.calls.map((call) => JSON.parse(call[1].body))
+    expect(bodies[0]).toMatchObject({ max_tokens: 65536, reasoning_effort: 'low' })
+    expect(bodies[1].max_tokens).toBe(65536)
+    expect(bodies[1].reasoning_effort).toBeUndefined()
+    expect(bodies[2]).toMatchObject({ max_tokens: 8192 })
+    expect(bodies[2].reasoning_effort).toBeUndefined()
+  })
+
+  it('says thinking used up the length when the stream ends there', async () => {
+    const encoder = new TextEncoder()
+    const parts = [
+      'data: {"choices":[{"delta":{"reasoning_content":"先核对熟度"}}]}\n\n',
+      'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n',
+    ]
+    let i = 0
+    const stream = new ReadableStream({
+      pull(controller) {
+        if (i >= parts.length) controller.close()
+        else controller.enqueue(encoder.encode(parts[i++]))
+      },
+    })
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(stream, { status: 200 }))
+    await expect(askAi(settings, 's', 'q', fetchImpl)).rejects.toThrow('把长度用在思考上')
   })
 
   it('maps network failures to a friendly error', async () => {

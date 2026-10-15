@@ -11,17 +11,21 @@ describe('food answer', () => {
     expect(prompt).toContain('"level":"avoid"')
     expect(prompt).toContain('不要 Markdown')
     expect(prompt).toContain('发物')
+    expect(prompt).toContain('effect')
+    expect(prompt).toContain('吃了的后果')
   })
 
   it('parses a finished answer and a partial stream', () => {
-    expect(parseFoodAnswer('{"level":"ok","reason":"补钙的主要来源","advice":"每天一杯"}')).toEqual({
+    expect(parseFoodAnswer('{"level":"ok","reason":"补钙的主要来源","effect":"有助于补钙，正常份量没有明确坏处","advice":"每天一杯"}')).toEqual({
       level: 'ok',
       reason: '补钙的主要来源',
+      effect: '有助于补钙，正常份量没有明确坏处',
       advice: '每天一杯',
     })
     expect(parseFoodAnswer('{"level":"caution","reason":"要蒸熟才安')).toEqual({
       level: 'caution',
       reason: '要蒸熟才安',
+      effect: '',
       advice: '',
     })
   })

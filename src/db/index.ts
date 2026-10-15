@@ -8,6 +8,19 @@ export interface AiSettings {
   baseUrl: string
   apiKey: string
   model: string
+  /** 模型上下文窗口，单位 token。思考和回答都从这次输出里扣。 */
+  contextTokens?: number
+}
+
+/** 单次输出上限。超过 524288 时接口会直接拒绝。 */
+export const DEFAULT_CONTEXT_TOKENS = 524_288
+
+export function contextTokensOf(settings: Pick<AiSettings, 'contextTokens'> | undefined): number {
+  const value = settings?.contextTokens
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_CONTEXT_TOKENS
+  const tokens = Math.floor(value)
+  if (tokens < 1024) return DEFAULT_CONTEXT_TOKENS
+  return Math.min(tokens, DEFAULT_CONTEXT_TOKENS)
 }
 
 export interface Profile {

@@ -12,6 +12,7 @@ import { exportBackup, importBackup, parseBackup, BackupError } from '@/db/backu
 import { downloadFile } from '@/utils/download'
 import type { ProfileValues } from '@/core/profileValidation'
 import type { SupplementId } from '@/content/types'
+import { contextTokensOf, DEFAULT_CONTEXT_TOKENS } from '@/db'
 
 const { today } = useClock()
 const profileStore = useProfileStore()
@@ -45,10 +46,19 @@ async function saveSupps() {
   message.value = '补剂设置已保存'
 }
 
-const ai = reactive({ baseUrl: p.value.ai?.baseUrl ?? '', apiKey: p.value.ai?.apiKey ?? '', model: p.value.ai?.model ?? '' })
+const ai = reactive({
+  baseUrl: p.value.ai?.baseUrl ?? '',
+  apiKey: p.value.ai?.apiKey ?? '',
+  model: p.value.ai?.model ?? '',
+  contextTokens: contextTokensOf(p.value.ai),
+})
 async function saveAi() {
   const filled = ai.baseUrl.trim() && ai.apiKey.trim() && ai.model.trim()
-  await profileStore.saveAi(filled ? { baseUrl: ai.baseUrl.trim(), apiKey: ai.apiKey.trim(), model: ai.model.trim() } : undefined)
+  await profileStore.saveAi(
+    filled
+      ? { baseUrl: ai.baseUrl.trim(), apiKey: ai.apiKey.trim(), model: ai.model.trim(), contextTokens: contextTokensOf(ai) }
+      : undefined,
+  )
   message.value = filled ? 'AI 设置已保存' : '已关闭 AI 问一问'
 }
 
@@ -103,6 +113,11 @@ async function doImport(e: Event) {
       <label class="field"><span>接口地址</span><input v-model="ai.baseUrl" placeholder="https://api.deepseek.com/v1" /></label>
       <label class="field"><span>API Key</span><input v-model="ai.apiKey" type="password" autocomplete="off" /></label>
       <label class="field"><span>模型名</span><input v-model="ai.model" placeholder="deepseek-chat" /></label>
+      <label class="field">
+        <span>上下文长度</span>
+        <input v-model.number="ai.contextTokens" type="number" min="1024" :max="DEFAULT_CONTEXT_TOKENS" step="1024" inputmode="numeric" :placeholder="String(DEFAULT_CONTEXT_TOKENS)" />
+      </label>
+      <p class="muted small">默认 {{ DEFAULT_CONTEXT_TOKENS }}。思考和回答都从这里扣。</p>
       <button class="btn light block-btn" @click="saveAi">保存 AI 设置</button>
     </section>
 

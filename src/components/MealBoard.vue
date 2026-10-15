@@ -114,7 +114,7 @@ function onSwap() {
             {{ eaten.includes(active) ? '已吃' : '标记已吃' }}
           </button>
           <button type="button" class="swap" :disabled="locked || paintingSlot === active || !(card(active) || plan[active])" @click="onSwap">换一份</button>
-          <button v-if="dishes?.[active] && !dishes[active]?.image && !paintingSlot" type="button" class="swap" @click="emit('retryImage', active)">画一张</button>
+          <button v-if="dishes?.[active] && paintingSlot !== active" type="button" class="swap" @click="emit('retryImage', active)">{{ dishes[active]?.image ? '重画' : '画一张' }}</button>
         </div>
       </div>
     </div>

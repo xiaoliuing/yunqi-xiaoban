@@ -14,9 +14,27 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/** 浅白食物和白碗、白背景会糊成空碗，画之前改成盛满、颜色能分开。 */
+function visibleFood(scene: string): string {
+  const filled = scene
+    .replace(/\bsmall cooked pale pork pieces\b/gi, 'light brown pork pieces sitting on the surface')
+    .replace(/\bpale pork\b/gi, 'light brown pork')
+    .replace(/\bsoft white yam chunks\b/gi, 'ivory yam slices sitting on the surface')
+    .replace(/\bwhite yam\b/gi, 'ivory yam')
+    .replace(/\bsmooth pale porridge\b/gi, 'creamy porridge filling the bowl to the brim')
+    .replace(/\bpale porridge\b/gi, 'creamy porridge filling the bowl to the brim')
+    .replace(/\bsmooth pale yellow custard\b/gi, 'smooth yellow custard filling the bowl to the brim, the top even and flat')
+    .replace(/\bpale yellow custard\b/gi, 'yellow custard filling the bowl to the brim')
+    .replace(/\bsmall white bowl\b/gi, 'large white bowl')
+  if (/bowl/i.test(filled) && !/brim|filled/i.test(filled)) {
+    return `${filled} Each bowl is filled to the brim and the food covers the surface.`
+  }
+  return filled
+}
+
 /** 把模型写的画面收成和食谱配图一样的短提示词。点名的物体会被画出来，所以先换掉那几个词。 */
 export function styleImagePrompt(scene: string): string {
-  const stripped = scene
+  const stripped = visibleFood(scene)
     .replaceAll(HEADER, '')
     .replaceAll(FOOTER, '')
     .replace(/only these dishes\.?/gi, '')

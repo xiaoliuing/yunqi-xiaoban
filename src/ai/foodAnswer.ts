@@ -6,6 +6,7 @@ const TAG_TEXT: Record<string, string> = { 荤: '肉禽和海鲜（素食）', �
 export interface FoodJudgement {
   level: FoodLevel | null
   reason: string
+  effect: string
   advice: string
 }
 
@@ -22,10 +23,11 @@ export function buildFoodSystemPrompt(ctx: { week: number; day: number; trimeste
     '- ok：常规做熟、正常份量可以吃的食物。reason 写它提供什么营养，advice 写一个具体吃法。',
     '听起来不像食物时，level 用 caution，reason 说明无法按食物判断，advice 请用户换一个具体食物名。',
     '拿不准时用 caution，不要编造研究数据或检验数值。',
-    '只输出一个 JSON 对象，不要 Markdown，不要代码块，不要任何前后说明。reason 和 advice 各一句简体中文，每句不超过 40 个字。语气照这三条例子：',
-    '{"level":"avoid","reason":"酒精会通过胎盘影响胎儿发育，不存在安全剂量","advice":"整个孕期都不要喝，含酒精的菜也避免"}',
-    '{"level":"caution","reason":"含生鱼的寿司有寄生虫和细菌风险","advice":"可以吃全熟食材做的寿司，如鳗鱼、玉子、蔬菜卷"}',
-    '{"level":"ok","reason":"优质蛋白和胆碱的好来源","advice":"每天 1 个，煮熟吃"}',
+    '只输出一个 JSON 对象，不要 Markdown，不要代码块，不要任何前后说明。reason、effect、advice 各一句简体中文，每句不超过 40 个字。',
+    'reason 写判断原因。effect 写吃了的后果，好处或坏处都要说清楚，不要只写「适量」。advice 写具体怎么吃或不吃。语气照这三条例子：',
+    '{"level":"avoid","reason":"酒精会通过胎盘，不存在安全剂量","effect":"可能影响胎儿发育，没有安全的喝法","advice":"整个孕期都不要喝，含酒精的菜也避免"}',
+    '{"level":"caution","reason":"生鱼有寄生虫和细菌风险","effect":"生吃可能感染，做熟后这个风险就小了","advice":"只吃全熟食材做的寿司，如鳗鱼、玉子、蔬菜卷"}',
+    '{"level":"ok","reason":"优质蛋白和胆碱的好来源","effect":"正常份量有助于补蛋白，没有明确坏处","advice":"每天 1 个，煮熟吃"}',
     'level 只能是 ok、caution、avoid。',
   ].filter(Boolean).join('\n')
 }
@@ -41,6 +43,7 @@ export function parseFoodAnswer(text: string): FoodJudgement {
   return {
     level: level ?? null,
     reason: jsonString(text, 'reason'),
+    effect: jsonString(text, 'effect'),
     advice: jsonString(text, 'advice'),
   }
 }

@@ -24,12 +24,18 @@ describe('meal answer', () => {
     expect(prompt).toContain('辣、香菜')
     expect(prompt).toContain('补铁、补钙、DHA')
     expect(prompt).toContain('番茄面')
+    expect(prompt).toContain('五餐都由你自己搭配')
+    expect(prompt).toContain('豆腐脑 · 小包子')
+    expect(prompt).toContain('不要输出例子里的菜')
     expect(prompt).toContain('breakfast')
     expect(prompt).toContain('不要 Markdown')
     expect(prompt).toContain('简体中文')
     expect(prompt).toContain('立刻输出 JSON')
     expect(prompt).toContain('酒')
     expect(prompt).toContain('imagePrompt')
+    expect(prompt).toContain('盘数和段数一样')
+    expect(prompt).toContain('soft red wedges')
+    expect(prompt).toContain('vivid golden millet porridge')
   })
 
   it('reads finished meals and ignores a slot that is still streaming', () => {

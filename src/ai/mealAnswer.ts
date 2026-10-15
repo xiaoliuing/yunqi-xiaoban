@@ -1,5 +1,6 @@
 import { TRIMESTER_LABEL } from '@/content/nutrition'
 import { FOODS } from '@/content/foods'
+import { RECIPES } from '@/content/recipes'
 import type { AiDish, Exclusions, Ingredient, IngredientCategory, NutrientTag, PlanSlot, Trimester } from '@/content/types'
 
 const SLOTS: PlanSlot[] = ['breakfast', 'snackAm', 'lunch', 'snackPm', 'dinner']
@@ -34,7 +35,7 @@ export function buildMealSystemPrompt(ctx: {
   const current = (ctx.currentNames ?? []).filter(Boolean)
   return [
     '你是孕期家常菜的配餐员。只安排今天一个人的五餐，依据《中国居民膳食指南（2022）》孕期部分。',
-    '思考用简体中文，最多三句，不要展开食物安全审查，想完立刻输出 JSON。正式输出只能是一个 JSON 对象，不要 Markdown，不要代码块，不要前后说明。',
+    '菜名和步骤用简体中文。不要逐条做安全审查，立刻输出 JSON。正式输出只能是一个 JSON 对象，不要 Markdown，不要代码块，不要前后说明。',
     `用户目前孕 ${ctx.week} 周 ${ctx.day} 天，处于${TRIMESTER_LABEL[ctx.trimester]}。份量按一位孕妈妈在家做的一餐来写。`,
     ctx.focus.length ? `本阶段营养重点是${ctx.focus.join('、')}，全天覆盖即可，不必每餐都有。` : '',
     avoid.length ? `用户忌口：${avoid.join('、')}。这些食材和用它们做的菜都不要出现。` : '',
@@ -43,12 +44,17 @@ export function buildMealSystemPrompt(ctx: {
     '五餐的键必须是 breakfast、snackAm、lunch、snackPm、dinner，一个都不能少，主菜不要重复。',
     'breakfast 是早餐：一份主食加一份蛋白，清淡。snackAm 和 snackPm 是加餐：一小份水果、奶或坚果，比正餐简单。lunch 和 dinner 是完整的一餐，名字用「 · 」把主菜、主食、蔬菜连起来，晚餐比午餐略少。',
     '每餐字段：name（不超过 24 个字）、tip（一句，不超过 20 个字）、tags（1 到 3 个，只能从给定列表里选）、ingredients（正餐 3 到 6 样，加餐 1 到 3 样）、steps（2 到 4 步，每步不超过 24 个字）、imagePrompt。',
-    'imagePrompt 用英文写这张图里能看到的成品，从左到右，不超过 400 个字符。只写碗盘和做好的食物。用 grains、soft orange pieces、solid yellow center、custard、white liquid 这类词。不要写 pumpkin、yolk、rice、raw，也不要写 never、no、not。不要写人、文字、筷子、勺子、整只蔬菜，也不要写背景和画风。',
+    'imagePrompt 用英文写成品长什么样，不超过 500 个字符。按 name 里「 · 」的顺序从左到右各写一盘，盘数和段数一样，加餐只有一道就只写这一道。每道都写容器、颜色、形状，以及一眼能认出的配料，必须和这一餐的 name、ingredients 对得上。',
+    '每只碗都要写 filling the bowl to the brim，食物盖住碗面。粥、瘦肉、山药不要写成 pale 或 white，浅色会和白碗、白背景画成空碗。',
+    '写法照这些成品的样子：小米粥写 vivid golden millet porridge filling the bowl to the brim；白粥写 creamy porridge filling the bowl to the brim；山药写 ivory yam slices sitting on the surface；瘦肉写 light brown pork pieces sitting on the surface；南瓜写 three soft orange pieces；红薯写 split orange sweet potato；米饭写 soft white grains filling the bowl to the brim；杂粮饭写 white grains mixed with brown grains；面条写 noodles；水煮蛋写 boiled-egg halves cut side up with solid yellow centers；蒸蛋写 smooth yellow custard filling the bowl to the brim；番茄写 soft red wedges；牛肉写 small brown meat chunks；鸡肉写 light brown chicken pieces；鱼写 one cooked pale fish；虾写 pink curled shrimp；西兰花写 small bright green florets；叶菜写 dark green cooked leaves；豆腐写 soft white cubes；酸奶写 one small glass of plain white yogurt；水果写切开后能看见的果肉。',
+    '不要写出 pumpkin、yolk、rice、raw、never、no、not 这几个英文词。不要写人、文字、筷子、勺子、整只没切开的蔬菜，也不要写背景和画风。',
     `tags 只能是：${TAGS.join('、')}。`,
     `ingredients 里的 category 只能是：${CATEGORIES.join('、')}。amount 要带单位，例如 50g、1 个、200ml。食材用中国家庭超市买得到的。`,
-    current.length ? `下面这些已经推荐过，请换成另一套做法：${current.join('、')}。` : '',
-    '结构照这个例子，但菜要重新搭配，不要照抄：',
-    '{"breakfast":{"name":"小米南瓜粥 · 水煮蛋","tip":"南瓜煮软，蛋黄要凝固","tags":["蛋白质","清淡止吐"],"ingredients":[{"name":"小米","amount":"50g","category":"主食"},{"name":"南瓜","amount":"100g","category":"蔬菜"},{"name":"鸡蛋","amount":"1 个","category":"蛋奶"}],"steps":["小米和南瓜煮 25 分钟","鸡蛋冷水下锅，水开后再煮 8 分钟"],"imagePrompt":"Left half: one large white bowl of vivid golden millet porridge with three soft orange pieces in it. Right half: one white plate with two boiled-egg halves, cut side up, solid yellow centers."},"snackAm":{"name":"原味酸奶","tip":"选巴氏杀菌的","tags":["补钙"],"ingredients":[{"name":"原味酸奶","amount":"150g","category":"蛋奶"}],"steps":["打开直接喝"],"imagePrompt":"The picture shows one small glass of plain white yogurt."},"lunch":{"name":"番茄炖牛腩 · 杂粮饭 · 蒜蓉西兰花","tip":"牛肉要炖到软烂","tags":["补铁","蛋白质"],"ingredients":[{"name":"牛腩","amount":"80g","category":"肉禽"},{"name":"番茄","amount":"150g","category":"蔬菜"},{"name":"杂粮米","amount":"70g","category":"主食"},{"name":"西兰花","amount":"100g","category":"蔬菜"}],"steps":["牛腩焯水后和番茄炖 40 分钟","杂粮米煮熟","西兰花焯熟，少许蒜末"],"imagePrompt":"Left: one white bowl of small brown meat chunks in a red sauce. Center: one white bowl filled level with white grains mixed with brown grains. Right: one white plate of small bright green florets."},"snackPm":{"name":"苹果","tip":"洗净连皮吃","tags":["膳食纤维"],"ingredients":[{"name":"苹果","amount":"1 个","category":"水果"}],"steps":["洗净切块"],"imagePrompt":"The picture shows one apple cut open on a white plate, pale flesh showing."},"dinner":{"name":"清蒸鲈鱼 · 米饭 · 炒菠菜","tip":"鱼要完全蒸熟","tags":["DHA","补铁"],"ingredients":[{"name":"鲈鱼","amount":"80g","category":"水产"},{"name":"大米","amount":"60g","category":"主食"},{"name":"菠菜","amount":"150g","category":"蔬菜"}],"steps":["鲈鱼蒸 10 分钟","米饭煮熟","菠菜焯后快炒"],"imagePrompt":"Left: one oval white plate with one cooked pale fish. Center: one white bowl filled level with soft white grains. Right: one white plate of dark green cooked leaves."}}',
+    '五餐都由你自己搭配。菜名、食材和步骤按今天的营养重点现想，写成家里能做的家常菜，不要复用现成套餐。',
+    `这些菜名不要再用：${RECIPES.map((recipe) => recipe.name).join('、')}。`,
+    current.length ? `今天已经出现过这些，也要避开：${current.join('、')}。` : '',
+    '下面的 JSON 只说明字段格式。不要输出例子里的菜：',
+    '{"breakfast":{"name":"香菇鸡肉粥 · 茶叶蛋","tip":"鸡肉撕碎，蛋要煮透","tags":["蛋白质","清淡止吐"],"ingredients":[{"name":"大米","amount":"40g","category":"主食"},{"name":"鸡胸肉","amount":"40g","category":"肉禽"},{"name":"香菇","amount":"2 朵","category":"蔬菜"},{"name":"鸡蛋","amount":"1 个","category":"蛋奶"}],"steps":["米、香菇和鸡肉一起煮 25 分钟","鸡蛋煮 8 分钟后敲碎入味"],"imagePrompt":"Left half: one large white bowl of creamy porridge filling the bowl to the brim, with light brown chicken pieces and brown mushroom slices on the surface. Right half: one white plate with one brown peeled egg cut open, solid yellow center."},"snackAm":{"name":"火龙果","tip":"去皮切块","tags":["膳食纤维"],"ingredients":[{"name":"火龙果","amount":"150g","category":"水果"}],"steps":["去皮切块"],"imagePrompt":"The picture shows one dragon fruit cut open on a white plate, black seeds in pale flesh."},"lunch":{"name":"土豆炖鸡块 · 小米饭 · 清炒油麦菜","tip":"鸡块炖到能用勺子切断","tags":["蛋白质","补铁"],"ingredients":[{"name":"鸡腿肉","amount":"80g","category":"肉禽"},{"name":"土豆","amount":"100g","category":"蔬菜"},{"name":"小米","amount":"60g","category":"主食"},{"name":"油麦菜","amount":"150g","category":"蔬菜"}],"steps":["鸡块和土豆炖 30 分钟","小米煮成饭","油麦菜快炒"],"imagePrompt":"Left: one white bowl of pale cooked chicken pieces and soft yellow potato chunks in a light sauce. Center: one white bowl filled level with vivid golden millet grains. Right: one white plate of long dark green cooked leaves."},"snackPm":{"name":"巴氏奶","tip":"温热再喝","tags":["补钙"],"ingredients":[{"name":"巴氏奶","amount":"200ml","category":"蛋奶"}],"steps":["温热后喝"],"imagePrompt":"The picture shows one clear glass of white milk."},"dinner":{"name":"番茄豆腐煲 · 软米饭 · 蒜蓉生菜","tip":"豆腐保持完整","tags":["蛋白质","维C"],"ingredients":[{"name":"北豆腐","amount":"120g","category":"豆制品"},{"name":"番茄","amount":"150g","category":"蔬菜"},{"name":"大米","amount":"50g","category":"主食"},{"name":"生菜","amount":"120g","category":"蔬菜"}],"steps":["番茄炒出汁后放豆腐煮 8 分钟","米饭煮软","生菜少油快炒"],"imagePrompt":"Left: one white bowl of soft white cubes and several soft red wedges in a light red sauce. Center: one white bowl filled level with soft white grains. Right: one white plate of pale green cooked leaves."}}',
   ].filter(Boolean).join('\n')
 }
 

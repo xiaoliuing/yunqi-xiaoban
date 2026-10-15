@@ -37,7 +37,7 @@ export function useAiMealImages() {
     for (const [index, slot] of slots.entries()) {
       if (mine !== token) return
       const dish = meals.logs[date]?.dishes?.[slot]
-      if (!dish || dish.image) continue
+      if (!dish || (dish.image && !only)) continue
       paintingSlot.value = slot
       try {
         const dataUrl = await requestMealImage(dish.imagePrompt || fallbackScene(dish.name))

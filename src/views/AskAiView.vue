@@ -20,16 +20,53 @@ const error = ref('')
 const loading = ref(false)
 const resultEl = useTemplateRef<HTMLElement>('result')
 const examples = ['今天孕吐吃不下，有什么推荐？', '晚上饿了吃什么不容易胖？', '贫血的话一周怎么安排补铁？']
+const ASK_LAST_KEY = 'yunqi-ask-last'
+
+interface AskLast {
+  question: string
+  answer: string
+  warnings: string[]
+}
+
+function readAskLast(): AskLast | null {
+  try {
+    const raw = localStorage.getItem(ASK_LAST_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw) as Partial<AskLast>
+    if (typeof data.question !== 'string' || typeof data.answer !== 'string' || !data.answer.trim()) return null
+    const warnings = Array.isArray(data.warnings) ? data.warnings.filter((item) => typeof item === 'string') : []
+    return { question: data.question, answer: data.answer, warnings }
+  } catch {
+    return null
+  }
+}
+
+function writeAskLast(data: AskLast) {
+  try {
+    localStorage.setItem(ASK_LAST_KEY, JSON.stringify(data))
+  } catch {
+    // 写不进去时这一次仍显示，下次进来就没有了
+  }
+}
+
+const saved = readAskLast()
+const asked = ref(saved?.question ?? '')
+if (saved) {
+  question.value = saved.question
+  answer.value = saved.answer
+  warnings.value = saved.warnings
+}
 
 const ready = computed(() => profileStore.aiReady)
 
 async function send() {
   const p = profileStore.profile
-  if (!p?.ai || !question.value.trim()) return
+  const pending = question.value.trim()
+  if (!p?.ai || !pending) return
   loading.value = true
   error.value = ''
   reasoning.value = ''
-  answer.value = ''
+  let fresh = false
   try {
     await Promise.all([records.loadCheckups(), records.loadWeights(), records.loadSupplements(today.value)])
     const sys = buildSystemPrompt(assemblePromptContext({
@@ -44,17 +81,25 @@ async function send() {
       weights: records.weights,
       supplementsTaken: records.supplementsTaken[today.value] ?? [],
     }))
-    await askAi(p.ai, sys, question.value.trim(), fetch, (transcript) => {
-      const first = !reasoning.value && !answer.value
+    await askAi(p.ai, sys, pending, fetch, (transcript) => {
+      const first = !reasoning.value && !fresh
       reasoning.value = transcript.reasoning
+      if (first) nextTick(() => resultEl.value?.scrollIntoView({ block: 'nearest' }))
+      if (!transcript.content) return
+      if (!fresh) {
+        fresh = true
+        asked.value = pending
+        answer.value = ''
+        warnings.value = []
+      }
       answer.value = transcript.content
       warnings.value = findAvoidMentions(transcript.content)
-      if (first) nextTick(() => resultEl.value?.scrollIntoView({ block: 'nearest' }))
     })
   } catch (e) {
     error.value = e instanceof AiError ? e.message : '出了点问题，请稍后再试'
   } finally {
     loading.value = false
+    if (fresh && answer.value.trim()) writeAskLast({ question: asked.value, answer: answer.value, warnings: warnings.value })
   }
 }
 </script>
@@ -70,13 +115,17 @@ async function send() {
       <div class="chips">
         <button v-for="e in examples" :key="e" class="chip" @click="question = e">{{ e }}</button>
       </div>
-      <button class="btn dark block-btn send" :disabled="loading || !question.trim()" @click="send">
-        {{ loading ? (answer ? '回答中…' : '思考中…') : '提问' }}
-      </button>
+      <div class="actions">
+        <button type="button" class="btn light clear" :disabled="loading || !question" @click="question = ''">一键清空</button>
+        <button class="btn dark send" :disabled="loading || !question.trim()" @click="send">
+          {{ loading ? (answer ? '回答中…' : '思考中…') : '提问' }}
+        </button>
+      </div>
       <p v-if="error" class="error">{{ error }}</p>
       <div v-if="reasoning || answer" ref="result" class="result">
         <ThinkingNote v-if="reasoning" :text="reasoning" :live="loading && !answer" />
         <article v-if="answer" class="card answer">
+          <p v-if="asked" class="asked">{{ asked }}</p>
           <p v-if="warnings.length" class="warn">回答里提到了孕期应避免的食物：{{ warnings.join('、') }}，请以「能不能吃」里的说明为准。</p>
           <MarkdownBody :source="answer" />
           <span v-if="loading" class="caret" aria-hidden="true" />
@@ -91,10 +140,13 @@ async function send() {
 .notice { padding: 16px; font-size: 14px; line-height: 1.6; }
 .notice a { color: var(--apricot); }
 .q { width: 100%; height: 110px; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--card); font-size: 15px; resize: vertical; margin-bottom: 12px; }
-.send { margin-top: 16px; height: 46px; }
+.actions { display: flex; gap: 10px; margin-top: 16px; }
+.clear { flex: none; height: 46px; padding: 0 16px; }
+.send { flex: 1; height: 46px; }
 .error { color: var(--alert); font-size: 13.5px; }
 .result { margin-top: 18px; display: grid; gap: 10px; }
 .answer { padding: 16px; }
+.asked { margin: 0 0 12px; font-family: var(--font-title); font-size: 16px; color: var(--ink); }
 .warn { margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--alert-soft); color: var(--alert); font-size: 13px; }
 .caret {
   display: inline-block; width: 2px; height: 1em; margin-left: 2px;
