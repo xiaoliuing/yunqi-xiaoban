@@ -1,3 +1,4 @@
+import type { AiSettings } from '@/db'
 import { AiError } from './client'
 
 const HEADER = 'Bold cartoon, thick dark outlines, bright flat colors, food drawn large and clear.'
@@ -54,35 +55,68 @@ export function fallbackScene(name: string): string {
 }
 
 interface ImageBody {
-  dataUrl?: string
-  message?: string
-  statusCode?: number
+  data?: { image_base64?: string[] }
+  base_resp?: { status_code?: number; status_msg?: string }
 }
 
-/** 交给本机开发服务去调绘图接口。配图服务没开、或接口拒绝时抛出 AiError。 */
+/** 和聊天一样，用设置里的接口地址。文生图在 `/image_generation`，不走网站自己的路径。 */
+export function imageApiUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, '') + '/image_generation'
+}
+
+function dataUrl(encoded: string): string {
+  const raw = encoded.replace(/^data:image\/\w+;base64,/, '')
+  const mime = raw.startsWith('iVBOR') ? 'image/png' : raw.startsWith('UklGR') ? 'image/webp' : 'image/jpeg'
+  return `data:${mime};base64,${raw}`
+}
+
+function explain(status: number | undefined, fallback: string): string {
+  if (status === 1002 || status === 429) return '绘图排队中，稍后再试'
+  if (status === 1004 || status === 2049 || status === 401 || status === 403) return 'API Key 无效，请在设置里检查'
+  if (status === 1008) return '绘图余额不足'
+  if (status === 1026) return '这张图的描述没通过审核'
+  if (status === 2013) return '绘图参数不对'
+  return fallback
+}
+
+/** 用设置里的密钥直接请求文生图。接口拒绝时抛出 AiError。 */
 export async function requestMealImage(
   scene: string,
+  settings: Pick<AiSettings, 'baseUrl' | 'apiKey'>,
   fetchImpl: typeof fetch = fetch,
   wait: (ms: number) => Promise<void> = delay,
 ): Promise<string> {
+  const baseUrl = settings.baseUrl?.trim()
+  const apiKey = settings.apiKey?.trim()
+  if (!baseUrl || !apiKey) throw new AiError('请先在设置里填写接口地址和 API Key')
   const prompt = styleImagePrompt(scene)
   let pause = 3000
   for (let attempt = 1; attempt <= 4; attempt++) {
     let response: Response
     try {
-      response = await fetchImpl('/api/meal-image', {
+      response = await fetchImpl(imageApiUrl(baseUrl), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'image-01',
+          prompt,
+          aspect_ratio: '16:9',
+          response_format: 'base64',
+          n: 1,
+          prompt_optimizer: false,
+          aigc_watermark: false,
+        }),
       })
     } catch {
-      throw new AiError('配图服务没有连上')
+      throw new AiError('绘图接口没有连上')
     }
     const body = (await response.json().catch(() => null)) as ImageBody | null
-    if (response.ok && body?.dataUrl?.startsWith('data:image/')) return body.dataUrl
-    const status = body?.statusCode ?? response.status
-    const retry = status === 1002 || status === 429
-    if (!retry || attempt === 4) throw new AiError(body?.message || '这张图没有画出来')
+    const status = body?.base_resp?.status_code
+    const encoded = body?.data?.image_base64?.[0]
+    if (response.ok && (status == null || status === 0) && encoded) return dataUrl(encoded)
+    const code = status ?? response.status
+    const retry = code === 1002 || code === 429
+    if (!retry || attempt === 4) throw new AiError(explain(code, body?.base_resp?.status_msg || '这张图没有画出来'))
     await wait(pause)
     pause *= 2
   }

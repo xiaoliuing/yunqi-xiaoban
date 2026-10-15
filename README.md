@@ -79,7 +79,7 @@ pnpm meals:images
 
 在「我的 → 设置」里填写兼容 OpenAI 格式的接口地址、API Key 和模型名。Key 只存在这台手机上。
 
-让 AI 安排今天之后，配图由本机开发服务去画，密钥留在 `scripts/minimax.local`。所以这一步需要开着 `pnpm dev`。部署成网站之后，系统食谱的配图仍然看得到；AI 临时画的图需要开发服务。
+让 AI 安排今天之后，配图用设置里的同一个接口地址和 API Key，请求 `/image_generation`。密钥留在这台手机上，打包部署之后也能画。
 
 ## 部署
 
